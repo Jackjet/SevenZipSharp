@@ -25,7 +25,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("7-zip native library wrapper")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Markovtsev Vadim")]
-[assembly: AssemblyProduct("SevenZipSharp")]
+[assembly: AssemblyProduct("SevenZipSharp_jiangxf")]
 [assembly: AssemblyCopyright("Copyright (C) Markovtsev Vadim 2009, 2010, licenced under LGPLv3")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
