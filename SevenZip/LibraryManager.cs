@@ -63,10 +63,8 @@ namespace SevenZip
         /// </summary>
         private static IntPtr _modulePtr;
 
-        private static readonly object lockobj_in1 = new object();
-        private static readonly object lockobj_in2 = new object();
-        private static readonly object lockobj_out1 = new object();
-        private static readonly object lockobj_out2 = new object();
+        private static readonly object lockobj_in = new object();
+        private static readonly object lockobj_out = new object();
 
         /// <summary>
         /// 7-zip library features.
@@ -84,23 +82,15 @@ namespace SevenZip
 
         private static void InitUserInFormat(object user, InArchiveFormat format)
         {
-            if (!_inArchives.ContainsKey(user))
+            lock (lockobj_in)
             {
-                lock (lockobj_in1)
+                if (!_inArchives.ContainsKey(user))
+                    _inArchives.Add(user, new Dictionary<InArchiveFormat, IInArchive>());
+
+                if (!_inArchives[user].ContainsKey(format))
                 {
-                    if (!_inArchives.ContainsKey(user))
-                        _inArchives.Add(user, new Dictionary<InArchiveFormat, IInArchive>());
-                }
-            }
-            if (!_inArchives[user].ContainsKey(format))
-            {
-                lock (lockobj_in2)
-                {
-                    if (!_inArchives[user].ContainsKey(format))
-                    {
-                        _inArchives[user].Add(format, null);
-                        _totalUsers++;
-                    }
+                    _inArchives[user].Add(format, null);
+                    _totalUsers++;
                 }
             }
         }
@@ -108,26 +98,19 @@ namespace SevenZip
 #if COMPRESS
         private static void InitUserOutFormat(object user, OutArchiveFormat format)
         {
-            if (!_outArchives.ContainsKey(user))
+            lock (lockobj_out)
             {
-                lock (lockobj_out1)
+                if (!_outArchives.ContainsKey(user))
+                    _outArchives.Add(user, new Dictionary<OutArchiveFormat, IOutArchive>());
+
+                if (!_outArchives[user].ContainsKey(format))
                 {
-                    if (!_outArchives.ContainsKey(user))
-                        _outArchives.Add(user, new Dictionary<OutArchiveFormat, IOutArchive>());
-                }
-            }
-            if (!_outArchives[user].ContainsKey(format))
-            {
-                lock (lockobj_out2)
-                {
-                    if (!_outArchives[user].ContainsKey(format))
-                    {
-                        _outArchives[user].Add(format, null);
-                        _totalUsers++;
-                    }
+                    _outArchives[user].Add(format, null);
+                    _totalUsers++;
                 }
             }
         }
+    
 #endif
 
         private static void Init()
