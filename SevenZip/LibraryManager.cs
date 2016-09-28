@@ -63,12 +63,15 @@ namespace SevenZip
         /// </summary>
         private static IntPtr _modulePtr;
 
+        private static object lockobj_in = new object();
+        private static object lockobj_out = new object();
+
         /// <summary>
         /// 7-zip library features.
         /// </summary>
         private static LibraryFeature? _features;
 
-		private static Dictionary<object, Dictionary<InArchiveFormat, IInArchive>> _inArchives;
+        private static Dictionary<object, Dictionary<InArchiveFormat, IInArchive>> _inArchives;
 #if COMPRESS
 		private static Dictionary<object, Dictionary<OutArchiveFormat, IOutArchive>> _outArchives;
 #endif
@@ -79,28 +82,34 @@ namespace SevenZip
 
         private static void InitUserInFormat(object user, InArchiveFormat format)
         {
-            if (!_inArchives.ContainsKey(user))
+            lock (lockobj_in)
             {
-                _inArchives.Add(user, new Dictionary<InArchiveFormat, IInArchive>());
-            }
-            if (!_inArchives[user].ContainsKey(format))
-            {
-                _inArchives[user].Add(format, null);
-                _totalUsers++;
+                if (!_inArchives.ContainsKey(user))
+                {
+                    _inArchives.Add(user, new Dictionary<InArchiveFormat, IInArchive>());
+                }
+                if (!_inArchives[user].ContainsKey(format))
+                {
+                    _inArchives[user].Add(format, null);
+                    _totalUsers++;
+                }
             }
         }
 
 #if COMPRESS
         private static void InitUserOutFormat(object user, OutArchiveFormat format)
         {
-            if (!_outArchives.ContainsKey(user))
+            lock (lockobj_out)
             {
-                _outArchives.Add(user, new Dictionary<OutArchiveFormat, IOutArchive>());
-            }
-            if (!_outArchives[user].ContainsKey(format))
-            {
-                _outArchives[user].Add(format, null);
-                _totalUsers++;
+                if (!_outArchives.ContainsKey(user))
+                {
+                    _outArchives.Add(user, new Dictionary<OutArchiveFormat, IOutArchive>());
+                }
+                if (!_outArchives[user].ContainsKey(format))
+                {
+                    _outArchives[user].Add(format, null);
+                    _totalUsers++;
+                }
             }
         }
 #endif
