@@ -28,7 +28,6 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Collections.Concurrent;
 #if MONO
 using SevenZip.Mono.COM;
 #endif
@@ -64,45 +63,78 @@ namespace SevenZip
         /// </summary>
         private static IntPtr _modulePtr;
 
+        private static readonly object lockobj_in1 = new object();
+        private static readonly object lockobj_in2 = new object();
+        private static readonly object lockobj_out1 = new object();
+        private static readonly object lockobj_out2 = new object();
+
         /// <summary>
         /// 7-zip library features.
         /// </summary>
         private static LibraryFeature? _features;
 
-        private static ConcurrentDictionary<object, ConcurrentDictionary<InArchiveFormat, IInArchive>> _inArchives;
+        private static Dictionary<object, Dictionary<InArchiveFormat, IInArchive>> _inArchives;
 #if COMPRESS
-        private static ConcurrentDictionary<object, ConcurrentDictionary<OutArchiveFormat, IOutArchive>> _outArchives;
+        private static Dictionary<object, Dictionary<OutArchiveFormat, IOutArchive>> _outArchives;
 #endif
-        private static int _totalUsers = 0;
+        private static int _totalUsers;
 
         // private static string _LibraryVersion;
         private static bool? _modifyCapabale;
 
         private static void InitUserInFormat(object user, InArchiveFormat format)
         {
-            _inArchives.TryAdd(user, new ConcurrentDictionary<InArchiveFormat, IInArchive>());
-            if (_inArchives[user].TryAdd(format, null))
+            if (!_inArchives.ContainsKey(user))
             {
-                System.Threading.Interlocked.Increment(ref _totalUsers);
+                lock (lockobj_in1)
+                {
+                    if (!_inArchives.ContainsKey(user))
+                        _inArchives.Add(user, new Dictionary<InArchiveFormat, IInArchive>());
+                }
+            }
+            if (!_inArchives[user].ContainsKey(format))
+            {
+                lock (lockobj_in2)
+                {
+                    if (!_inArchives[user].ContainsKey(format))
+                    {
+                        _inArchives[user].Add(format, null);
+                        _totalUsers++;
+                    }
+                }
             }
         }
 
 #if COMPRESS
         private static void InitUserOutFormat(object user, OutArchiveFormat format)
         {
-            _outArchives.TryAdd(user, new ConcurrentDictionary<OutArchiveFormat, IOutArchive>());
-            if (_outArchives[user].TryAdd(format, null))
+            if (!_outArchives.ContainsKey(user))
             {
-                System.Threading.Interlocked.Increment(ref _totalUsers);
+                lock (lockobj_out1)
+                {
+                    if (!_outArchives.ContainsKey(user))
+                        _outArchives.Add(user, new Dictionary<OutArchiveFormat, IOutArchive>());
+                }
+            }
+            if (!_outArchives[user].ContainsKey(format))
+            {
+                lock (lockobj_out2)
+                {
+                    if (!_outArchives[user].ContainsKey(format))
+                    {
+                        _outArchives[user].Add(format, null);
+                        _totalUsers++;
+                    }
+                }
             }
         }
 #endif
 
         private static void Init()
         {
-            _inArchives = new ConcurrentDictionary<object, ConcurrentDictionary<InArchiveFormat, IInArchive>>();
+            _inArchives = new Dictionary<object, Dictionary<InArchiveFormat, IInArchive>>();
 #if COMPRESS
-            _outArchives = new ConcurrentDictionary<object, ConcurrentDictionary<OutArchiveFormat, IOutArchive>>();
+            _outArchives = new Dictionary<object, Dictionary<OutArchiveFormat, IOutArchive>>();
 #endif
         }
 
@@ -347,60 +379,47 @@ namespace SevenZip
             {
                 if (format is InArchiveFormat)
                 {
-                    if (_inArchives != null)
+                    if (_inArchives != null && _inArchives.ContainsKey(user) &&
+                        _inArchives[user].ContainsKey((InArchiveFormat)format) &&
+                        _inArchives[user][(InArchiveFormat)format] != null)
                     {
-                        ConcurrentDictionary<InArchiveFormat, IInArchive> idata1;
-                        if (_inArchives.TryGetValue(user, out idata1))
+                        try
                         {
-                            IInArchive idata2;
-                            if (idata1.TryRemove((InArchiveFormat)format, out idata2))
-                            {
-                                try
-                                {
-                                    Marshal.ReleaseComObject(idata2);
-                                }
-                                catch (InvalidComObjectException) { }
-                                System.Threading.Interlocked.Decrement(ref _totalUsers);
-                            }
-                            if (idata1.IsEmpty)
-                            {
-                                ConcurrentDictionary<InArchiveFormat, IInArchive> idata3;
-                                _inArchives.TryRemove(user, out idata3);
-                            }
+                            Marshal.ReleaseComObject(_inArchives[user][(InArchiveFormat)format]);
+                        }
+                        catch (InvalidComObjectException) { }
+                        _inArchives[user].Remove((InArchiveFormat)format);
+                        _totalUsers--;
+                        if (_inArchives[user].Count == 0)
+                        {
+                            _inArchives.Remove(user);
                         }
                     }
                 }
 #if COMPRESS
                 if (format is OutArchiveFormat)
                 {
-                    if (_outArchives != null)
+                    if (_outArchives != null && _outArchives.ContainsKey(user) &&
+                        _outArchives[user].ContainsKey((OutArchiveFormat)format) &&
+                        _outArchives[user][(OutArchiveFormat)format] != null)
                     {
-                        ConcurrentDictionary<OutArchiveFormat, IOutArchive> odata1;
-                        if (_outArchives.TryGetValue(user, out odata1))
+                        try
                         {
-                            IOutArchive odata2;
-                            if (odata1.TryRemove((OutArchiveFormat)format, out odata2))
-                            {
-                                try
-                                {
-                                    Marshal.ReleaseComObject(odata2);
-                                }
-                                catch (InvalidComObjectException) { }
-                                System.Threading.Interlocked.Decrement(ref _totalUsers);
-                            }
-                            if (odata1.IsEmpty)
-                            {
-                                ConcurrentDictionary<OutArchiveFormat, IOutArchive> odata3;
-                                _outArchives.TryRemove(user, out odata3);
-                            }
+                            Marshal.ReleaseComObject(_outArchives[user][(OutArchiveFormat)format]);
                         }
-
+                        catch (InvalidComObjectException) { }
+                        _outArchives[user].Remove((OutArchiveFormat)format);
+                        _totalUsers--;
+                        if (_outArchives[user].Count == 0)
+                        {
+                            _outArchives.Remove(user);
+                        }
                     }
                 }
 #endif
-                if ((_inArchives == null || _inArchives.IsEmpty)
+                if ((_inArchives == null || _inArchives.Count == 0)
 #if COMPRESS
- && (_outArchives == null || _outArchives.IsEmpty)
+ && (_outArchives == null || _outArchives.Count == 0)
 #endif
 )
                 {
