@@ -16,7 +16,7 @@
 
 using System;
 using System.IO;
-using SevenZip.Compression.LZMA;
+using SevenZip.Sdk.Compression.Lzma;
 
 namespace SevenZip
 {

@@ -25,7 +25,7 @@ using System.Threading;
 #else
 using System.Linq;
 #endif
-using SevenZip.Compression.LZMA;
+using SevenZip.Sdk.Compression.Lzma;
 #if MONO
 using SevenZip.Mono.COM;
 #endif
@@ -323,11 +323,8 @@ namespace SevenZip
                 {
                     GetArchiveInfo(true);
                 }
-                if (_isSolid != null)
-                {
-                    return _isSolid.Value;
-                }
-                throw new SevenZipException("_isSolid == null");
+                Debug.Assert(_isSolid != null);
+                return _isSolid.Value;
             }
         }
 
@@ -344,11 +341,8 @@ namespace SevenZip
                 {
                     GetArchiveInfo(true);
                 }
-                if (_filesCount != null)
-                {
-                    return _filesCount.Value;
-                }
-                throw new SevenZipException("_filesCount == null");
+                Debug.Assert(_filesCount != null);
+                return _filesCount.Value;                
             }
         }
 
@@ -416,7 +410,8 @@ namespace SevenZip
             }
             else
             {
-                if (!_fileName.EndsWith(".001", StringComparison.OrdinalIgnoreCase))
+                if (!_fileName.EndsWith(".001", StringComparison.OrdinalIgnoreCase)
+                    || (_volumeFileNames.Count == 1))
                 {
                     _archiveStream = new InStreamWrapper(
                         new ArchiveEmulationStreamProxy(new FileStream(
@@ -765,6 +760,7 @@ namespace SevenZip
             _archiveFileData = null;
             _archiveProperties = null;
             _archiveFileInfoCollection = null;
+            _inStream.Dispose();
             _inStream = null;
             if (_openCallback != null)
             {

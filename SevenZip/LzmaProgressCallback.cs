@@ -15,7 +15,7 @@
 */
 
 using System;
-using SevenZip;
+using SevenZip.Sdk;
 
 namespace SevenZip
 {
